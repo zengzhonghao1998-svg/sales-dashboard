@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全链路营销BI看板</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a1628;font-family:'Microsoft YaHei','PingFang SC',sans-serif;color:#c8d6e5;min-height:100vh}
+
+/* Header */
+.header-bar{height:3px;background:linear-gradient(90deg,#00f5d4,#0891b2,#818cf8,#00f5d4);box-shadow:0 0 20px rgba(0,245,212,.3)}
+.header{text-align:center;padding:20px 20px 12px}
+.header h1{font-size:24px;font-weight:700;background:linear-gradient(135deg,#00f5d4,#22d3ee,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:4px;text-shadow:0 0 30px rgba(0,245,212,.15)}
+.header .sub{font-size:12px;color:#5b7a9a;letter-spacing:2px;margin-top:4px}
+.status-bar{display:flex;justify-content:center;gap:30px;padding:8px 20px;font-size:11px;color:#4a6a8a;border-bottom:1px solid rgba(0,245,212,.06)}
+.status-bar .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#00f5d4;box-shadow:0 0 8px rgba(0,245,212,.6);margin-right:5px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.container{max-width:1500px;margin:0 auto;padding:14px 16px 30px}
+
+/* KPI Row */
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
+.kpi-card{background:linear-gradient(135deg,rgba(6,30,58,.9),rgba(8,47,73,.6));border:1px solid rgba(0,245,212,.12);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;transition:all .3s}
+.kpi-card:hover{border-color:rgba(0,245,212,.35);box-shadow:0 0 25px rgba(0,245,212,.06);transform:translateY(-1px)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:2px}
+.kpi-card:nth-child(1)::before{background:linear-gradient(90deg,#00f5d4,#0ea5e9)}
+.kpi-card:nth-child(2)::before{background:linear-gradient(90deg,#22d3ee,#3b82f6)}
+.kpi-card:nth-child(3)::before{background:linear-gradient(90deg,#0ea5e9,#818cf8)}
+.kpi-card:nth-child(4)::before{background:linear-gradient(90deg,#818cf8,#a78bfa)}
+.kpi-card:nth-child(5)::before{background:linear-gradient(90deg,#f59e0b,#f97316)}
+.kpi-card:nth-child(6)::before{background:linear-gradient(90deg,#10b981,#00f5d4)}
+.kpi-card .label{font-size:11px;color:#6b8aaa;letter-spacing:.5px;margin-bottom:4px}
+.kpi-card .value{font-size:22px;font-weight:700;font-family:'Courier New',monospace}
+.kpi-card:nth-child(1) .value{color:#00f5d4;text-shadow:0 0 15px rgba(0,245,212,.25)}
+.kpi-card:nth-child(2) .value{color:#22d3ee;text-shadow:0 0 15px rgba(34,211,238,.25)}
+.kpi-card:nth-child(3) .value{color:#0ea5e9;text-shadow:0 0 15px rgba(14,165,233,.25)}
+.kpi-card:nth-child(4) .value{color:#818cf8;text-shadow:0 0 15px rgba(129,140,248,.25)}
+.kpi-card:nth-child(5) .value{color:#fbbf24;text-shadow:0 0 15px rgba(251,191,36,.25)}
+.kpi-card:nth-child(6) .value{color:#34d399;text-shadow:0 0 15px rgba(52,211,153,.25)}
+.kpi-card .unit{font-size:12px;font-weight:400;opacity:.7;margin-left:3px}
+.kpi-card::after{content:'';position:absolute;top:0;left:0;width:50px;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.02),transparent);animation:scan 4s ease-in-out infinite;pointer-events:none}
+@keyframes scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+
+/* Chart Grid */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.chart-grid-bottom{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chart-box{background:linear-gradient(135deg,rgba(6,30,58,.85),rgba(8,47,73,.5));border:1px solid rgba(0,245,212,.08);border-radius:10px;padding:12px;position:relative}
+.chart-title{font-size:12px;color:#7a9abb;letter-spacing:1px;padding:2px 6px 6px;display:flex;align-items:center;gap:6px}
+.chart-title .tagc{font-size:9px;padding:1px 6px;border-radius:3px;background:rgba(0,245,212,.08);color:#00f5d4;border:1px solid rgba(0,245,212,.15)}
+.chart-wrap{width:100%;height:280px}
+.chart-wrap-sm{width:100%;height:260px}
+.concl-row{font-size:11px;color:#4a7a9a;padding:4px 6px 2px;letter-spacing:.3px;text-align:center;border-top:1px solid rgba(0,245,212,.04);margin-top:4px}
+
+/* Footer */
+.footer-bar{text-align:center;padding:14px;font-size:10px;color:#2a4a6a;letter-spacing:1px;border-top:1px solid rgba(0,245,212,.05);margin-top:14px}
+
+/* Modal */
+#drill-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(2,8,20,.88);z-index:1000;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#drill-modal .panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:92%;max-width:1100px;max-height:85vh;background:linear-gradient(135deg,rgba(6,30,58,.98),rgba(8,47,73,.92));border:1px solid rgba(0,245,212,.18);border-radius:14px;padding:20px;overflow-y:auto;box-shadow:0 0 50px rgba(0,245,212,.06)}
+#drill-modal .panel-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+#drill-modal .panel-title{font-size:16px;font-weight:600;color:#00f5d4;letter-spacing:1px}
+#drill-modal .close-btn{cursor:pointer;padding:3px 12px;border-radius:5px;background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.25);color:#ff6b6b;font-size:12px}
+.drill-tabs{display:flex;gap:6px;margin-bottom:10px;border-bottom:1px solid rgba(0,245,212,.08);padding-bottom:8px}
+.drill-tab{cursor:pointer;padding:5px 14px;border-radius:5px;font-size:12px;background:rgba(255,255,255,.04);color:#6b8aaa;border:1px solid transparent;transition:all .2s}
+.drill-tab.active{background:rgba(0,245,212,.12);color:#00f5d4;border-color:rgba(0,245,212,.25)}
+
+/* Responsive */
+@media(max-width:1000px){
+  .kpi-row{grid-template-columns:repeat(3,1fr)}
+  .chart-grid,.chart-grid-bottom{grid-template-columns:1fr}
+  .chart-wrap,.chart-wrap-sm{height:250px}
+  .header h1{font-size:18px}
+}
+
+/* Tab for main charts */
+.main-tabs{display:flex;gap:4px;margin-bottom:8px}
+.main-tab{cursor:pointer;padding:4px 12px;border-radius:4px;font-size:11px;background:rgba(255,255,255,.04);color:#6b8aaa;border:1px solid transparent;transition:all .2s}
+.main-tab.active{background:rgba(0,245,212,.1);color:#00f5d4;border-color:rgba(0,245,212,.2)}
+</style>
+</head>
+<body>
+
+<div class="header-bar"></div>
+<div class="header">
+  <h1>全链路营销智能看板</h1>
+  <div class="sub">FULL-FUNNEL MARKETING DASHBOARD · BRAND HEALTH · MEDIA · SOCIAL · JOURNEY · COMPETITIVE</div>
+</div>
+<div class="status-bar">
+  <span><span class="dot"></span>系统运行正常</span>
+  <span>数据范围: 2025全年</span>
+  <span>品牌: 华为/苹果/小米/OPPO/vivo/荣耀/三星</span>
+</div>
+
+<div class="container">
+
+  <!-- KPI -->
+  <div class="kpi-row" id="kpi-row">
+    <div class="kpi-card"><div class="label">平均品牌认知度</div><div class="value" id="k-awareness">--</div></div>
+    <div class="kpi-card"><div class="label">平均品牌考虑度</div><div class="value" id="k-consider">--</div></div>
+    <div class="kpi-card"><div class="label">全年社媒总声量</div><div class="value" id="k-volume">--</div></div>
+    <div class="kpi-card"><div class="label">媒介总花费</div><div class="value" id="k-spend">--</div></div>
+    <div class="kpi-card"><div class="label">平均CTR</div><div class="value" id="k-ctr">--</div></div>
+    <div class="kpi-card"><div class="label">平均CPC</div><div class="value" id="k-cpc">--</div></div>
+  </div>
+
+  <!-- Row 1: Media + Social -->
+  <div class="chart-grid">
+    <!-- Left: 媒介效果归因 -->
+    <div class="chart-box">
+      <div class="chart-title">📊 媒介效果归因 <span class="tagc">点击下钻</span></div>
+      <div class="main-tabs">
+        <span class="main-tab active" onclick="switchMediaTab(this,'channel')">渠道效率</span>
+        <span class="main-tab" onclick="switchMediaTab(this,'brand')">品牌×渠道</span>
+      </div>
+      <div class="chart-wrap" id="chart-media"></div>
+      <div class="concl-row" id="concl-media"></div>
+    </div>
+    <!-- Right: 舆情洞察 -->
+    <div class="chart-box">
+      <div class="chart-title">📰 舆情洞察 <span class="tagc">点击下钻</span></div>
+      <div class="main-tabs">
+        <span class="main-tab active" onclick="switchSocialTab(this,'sentiment')">情感分布</span>
+        <span class="main-tab" onclick="switchSocialTab(this,'trend')">声量趋势</span>
+        <span class="main-tab" onclick="switchSocialTab(this,'platform')">平台分布</span>
+      </div>
+      <div class="chart-wrap" id="chart-social"></div>
+      <div class="concl-row" id="concl-social"></div>
+    </div>
+  </div>
+
+  <!-- Row 2: Journey + Competitive -->
+  <div class="chart-grid-bottom">
+    <!-- Left: 购机路径 -->
+    <div class="chart-box">
+      <div class="chart-title">🔄 购机路径分析 <span class="tagc">点击下钻</span></div>
+      <div class="main-tabs">
+        <span class="main-tab active" onclick="switchJourneyTab(this,'loyalty')">品牌忠诚度</span>
+        <span class="main-tab" onclick="switchJourneyTab(this,'flow')">品牌流向</span>
+        <span class="main-tab" onclick="switchJourneyTab(this,'reasons')">换机原因</span>
+      </div>
+      <div class="chart-wrap-sm" id="chart-journey"></div>
+      <div class="concl-row" id="concl-journey"></div>
+    </div>
+    <!-- Right: 竞品格局 -->
+    <div class="chart-box">
+      <div class="chart-title">🏆 竞品格局 <span class="tagc">点击下钻</span></div>
+      <div class="main-tabs">
+        <span class="main-tab active" onclick="switchCompeteTab(this,'share')">市场份额</span>
+        <span class="main-tab" onclick="switchCompeteTab(this,'trend')">份额趋势</span>
+        <span class="main-tab" onclick="switchCompeteTab(this,'price')">价格分布</span>
+      </div>
+      <div class="chart-wrap-sm" id="chart-compete"></div>
+      <div class="concl-row" id="concl-compete"></div>
+    </div>
+  </div>
+
+  <div class="footer-bar">MARKETING BI DASHBOARD v1.0 · POWERED BY ECharts · DATA: 2025 FULL YEAR</div>
+</div>
+
+<!-- Drill Modal -->
+<div id="drill-modal">
+  <div class="panel">
+    <div class="panel-hd">
+      <span class="panel-title" id="drill-title">下钻分析</span>
+      <span class="close-btn" onclick="closeDrill()">关闭</span>
+    </div>
+    <div class="drill-tabs" id="drill-tabs"></div>
+    <div class="chart-wrap" id="drill-chart" style="height:380px;"></div>
+    <div class="concl-row" id="drill-concl"></div>
+  </div>
+</div>
+
+<script>
+// ===== 全局 =====
+var DATA = null;
+var drillChart = null;
+var drillCallback = null;
+
+// ===== 品牌色 =====
+var BRAND_COLORS = {'华为':'#d4322f','苹果':'#555555','小米':'#ff6900','OPPO':'#1a8c6e','vivo':'#415fff','荣耀':'#c8102e','三星':'#1428a0'};
+var BRAND_LIST = ['华为','苹果','小米','OPPO','vivo','荣耀','三星'];
+
+// ===== 加载数据 =====
+fetch('dashboard_data.json').then(function(r){return r.json()}).then(function(d){
+  DATA = d;
+  renderKPI(d.kpi);
+  renderMediaChart('channel');
+  renderSocialChart('sentiment');
+  renderJourneyChart('loyalty');
+  renderCompeteChart('share');
+}).catch(function(e){
+  document.querySelectorAll('.kpi-card .value').forEach(function(el){el.textContent='err'});
+  console.error(e);
+});
+
+// ===== KPI =====
+function renderKPI(k){
+  document.getElementById('k-awareness').innerHTML = k.avg_awareness + '<span class="unit">%</span>';
+  document.getElementById('k-consider').innerHTML = k.avg_consider + '<span class="unit">%</span>';
+  document.getElementById('k-volume').innerHTML = (k.total_social_volume/10000).toFixed(0) + '<span class="unit">万</span>';
+  document.getElementById('k-spend').innerHTML = k.total_media_spend + '<span class="unit">亿元</span>';
+  document.getElementById('k-ctr').innerHTML = k.avg_ctr + '<span class="unit">%</span>';
+  document.getElementById('k-cpc').innerHTML = k.avg_cpc + '<span class="unit">元</span>';
+}
+
+// ===== 工具 =====
+function makeConcl(id, text){ document.getElementById(id).textContent = text; }
+
+function openDrill(title, tabs, renderFn){
+  document.getElementById('drill-title').textContent = title;
+  var tb = document.getElementById('drill-tabs');
+  tb.innerHTML = '';
+  tabs.forEach(function(t, i){
+    var el = document.createElement('span');
+    el.className = 'drill-tab' + (i===0?' active':'');
+    el.textContent = t.label;
+    el.onclick = function(){
+      tb.querySelectorAll('.drill-tab').forEach(function(x){x.className='drill-tab';});
+      el.className='drill-tab active';
+      renderFn(t.key);
+    };
+    tb.appendChild(el);
+  });
+  document.getElementById('drill-modal').style.display = 'block';
+  if(tabs.length) renderFn(tabs[0].key);
+}
+
+function closeDrill(){
+  document.getElementById('drill-modal').style.display = 'none';
+}
+
+// ===== Media =====
+var mediaChart = null;
+var mediaView = 'channel';
+function switchMediaTab(el, view){
+  el.closest('.chart-box').querySelectorAll('.main-tab').forEach(function(x){x.classList.remove('active');});
+  el.classList.add('active');
+  mediaView = view;
+  renderMediaChart(view);
+}
+function renderMediaChart(view){
+  mediaChart = echarts.init(document.getElementById('chart-media'), 'dark');
+  if(view==='channel'){
+    var d = DATA.channel_efficiency;
+    var names = d.map(function(x){return x.channel;});
+    var cpc = d.map(function(x){return x.avg_cpc;});
+    var ctr = d.map(function(x){return x.avg_ctr;});
+    mediaChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+      legend:{data:['CPC(元)','CTR(%)'],textStyle:{color:'#6b8aaa',fontSize:10},top:0},
+      grid:{left:50,right:20,top:32,bottom:30},
+      xAxis:{type:'category',data:names,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:10,rotate:15}},
+      yAxis:[
+        {type:'value',name:'CPC(元)',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+        {type:'value',name:'CTR(%)',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{show:false},axisLabel:{color:'#6b8aaa',fontSize:10}}
+      ],
+      series:[
+        {name:'CPC(元)',type:'bar',data:cpc,barWidth:'35%',itemStyle:{borderRadius:[3,3,0,0],color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#00f5d4'},{offset:1,color:'#0891b2'}]}}},
+        {name:'CTR(%)',type:'line',data:ctr,yAxisIndex:1,smooth:true,symbol:'circle',symbolSize:6,lineStyle:{width:2,color:'#fbbf24'},itemStyle:{color:'#fbbf24'}}
+      ]
+    });
+    var best = d.reduce(function(a,b){return a.avg_cpc < b.avg_cpc ? a : b;});
+    makeConcl('concl-media','CPC最低渠道: '+best.channel+' ('+best.avg_cpc+'元) | 点击图表柱状图查看详细');
+    mediaChart.off('click');
+    mediaChart.on('click', function(p){
+      var ch = d[p.dataIndex].channel;
+      var sub = DATA.brand_channel.filter(function(x){return x['渠道']===ch;});
+      openDrill('渠道下钻: '+ch,
+        [{label:'品牌分布',key:'brand'}],
+        function(){
+          var ch2 = echarts.init(document.getElementById('drill-chart'),'dark');
+          var sn = sub.map(function(x){return x['品牌'];});
+          var sv2 = sub.map(function(x){return Math.round(x.spend/10000);});
+          ch2.setOption({
+            tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11},
+              formatter:function(ps){var p=ps[0];return '<strong>'+p.name+'</strong><br/>花费: '+p.value+' 万元';}},
+            grid:{left:55,right:20,top:15,bottom:35},
+            xAxis:{type:'category',data:sn,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:11}},
+            yAxis:{type:'value',name:'万元',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+            series:[{type:'bar',data:sv2,barWidth:'50%',itemStyle:{borderRadius:[4,4,0,0],color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#22d3ee'},{offset:1,color:'#0891b2'}]}},label:{show:true,position:'top',color:'#c8d6e5',fontSize:10,formatter:'{c}万'}}]
+          });
+          document.getElementById('drill-concl').textContent = '品牌在 '+ch+' 渠道的投入分布';
+        }
+      );
+    });
+  } else {
+    var d = DATA.brand_channel;
+    var chs = [...new Set(d.map(function(x){return x['渠道'];}))];
+    mediaChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+      legend:{data:chs,textStyle:{color:'#6b8aaa',fontSize:9},top:0},
+      grid:{left:50,right:20,top:36,bottom:35},
+      xAxis:{type:'category',data:BRAND_LIST,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      yAxis:{type:'value',name:'万元',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      series:chs.map(function(ch,i){
+        var vals = BRAND_LIST.map(function(b){
+          var f = d.filter(function(x){return x['品牌']===b && x['渠道']===ch;});
+          return f.length ? Math.round(f[0].spend/10000) : 0;
+        });
+        var colors = ['#00f5d4','#22d3ee','#0ea5e9','#818cf8','#fbbf24','#f97316','#34d399','#a78bfa'];
+        return {name:ch,type:'bar',stack:'total',data:vals,itemStyle:{color:colors[i%colors.length]}};
+      })
+    });
+    mediaChart.off('click');
+    mediaChart.on('click', function(p){
+      var brand = p.name;
+      var sub = DATA.brand_channel.filter(function(x){return x['品牌']===brand;});
+      openDrill('品牌下钻: '+brand,
+        [{label:'渠道花费分布',key:'ch'}],
+        function(){
+          var ch2 = echarts.init(document.getElementById('drill-chart'),'dark');
+          var sn = sub.map(function(x){return x['渠道'];});
+          var sv2 = sub.map(function(x){return Math.round(x.spend/10000);});
+          ch2.setOption({
+            tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+            grid:{left:55,right:20,top:15,bottom:35},
+            xAxis:{type:'category',data:sn,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:11}},
+            yAxis:{type:'value',name:'万元',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+            series:[{type:'bar',data:sv2,barWidth:'50%',itemStyle:{borderRadius:[4,4,0,0],color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#818cf8'},{offset:1,color:'#3b82f6'}]}},label:{show:true,position:'top',color:'#c8d6e5',fontSize:10,formatter:'{c}万'}}]
+          });
+          document.getElementById('drill-concl').textContent = brand+' 在各渠道的媒介花费分布';
+        }
+      );
+    });
+    makeConcl('concl-media','点击柱状图查看单个品牌的渠道花费详情');
+  }
+  mediaChart.resize();
+}
+
+// ===== Social =====
+var socialChart = null;
+function switchSocialTab(el, view){
+  el.closest('.chart-box').querySelectorAll('.main-tab').forEach(function(x){x.classList.remove('active');});
+  el.classList.add('active');
+  renderSocialChart(view);
+}
+function renderSocialChart(view){
+  socialChart = echarts.init(document.getElementById('chart-social'), 'dark');
+  if(view==='sentiment'){
+    var d = DATA.sentiment_by_brand;
+    var names = d.map(function(x){return x['品牌'];});
+    var pos = d.map(function(x){return x['正面占比(%)'];});
+    var neg = d.map(function(x){return x['负面占比(%)'];});
+    var neu = d.map(function(x){return x['中性占比(%)'];});
+    socialChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+      legend:{data:['正面','中性','负面'],textStyle:{color:'#6b8aaa',fontSize:10},top:0},
+      grid:{left:45,right:20,top:32,bottom:30},
+      xAxis:{type:'category',data:names,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      yAxis:{type:'value',max:100,name:'占比(%)',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10,formatter:'{value}%'}},
+      series:[
+        {name:'正面',type:'bar',stack:'total',data:pos,itemStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#34d399'},{offset:1,color:'#10b981'}]}}},
+        {name:'中性',type:'bar',stack:'total',data:neu,itemStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#6b8aaa'},{offset:1,color:'#4a6a8a'}]}}},
+        {name:'负面',type:'bar',stack:'total',data:neg,itemStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#f87171'},{offset:1,color:'#ef4444'}]}}}
+      ]
+    });
+    var best = d.reduce(function(a,b){return a['正面占比(%)'] > b['正面占比(%)'] ? a : b;});
+    makeConcl('concl-social','正面口碑最佳: '+best['品牌']+' ('+best['正面占比(%)']+'%) | 点击品牌查看详情');
+    socialChart.off('click');
+    socialChart.on('click', function(p){
+      var brand = p.name;
+      var tabs = [{label:'平台情感分布',key:'plt'},{label:'声量趋势',key:'trd'}];
+      openDrill('舆情下钻: '+brand, tabs, function(k){
+        var ch = echarts.init(document.getElementById('drill-chart'),'dark');
+        if(k==='plt'){
+          var ps = DATA.platform_sentiment;
+          var pl = ps.map(function(x){return x['平台'];});
+          var pp = ps.map(function(x){return x['正面']||0;});
+          var pn = ps.map(function(x){return x['负面']||0;});
+          ch.setOption({
+            tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+            legend:{data:['正面','负面'],textStyle:{color:'#6b8aaa',fontSize:10}},
+            grid:{left:45,right:20,top:32,bottom:30},
+            xAxis:{type:'category',data:pl,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:11}},
+            yAxis:{type:'value',name:'占比(%)',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+            series:[
+              {name:'正面',type:'bar',data:pp,itemStyle:{color:'#34d399'}},
+              {name:'负面',type:'bar',data:pn,itemStyle:{color:'#f87171'}}
+            ]
+          });
+          document.getElementById('drill-concl').textContent = '各平台舆情情感倾向分布';
+        } else {
+          var vols = DATA.brand_volume[brand] || [];
+          var dt = vols.map(function(x){return x['日期'];});
+          var vl = vols.map(function(x){return x['社媒声量'];});
+          ch.setOption({
+            tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+            grid:{left:50,right:20,top:15,bottom:35},
+            xAxis:{type:'category',data:dt,boundaryGap:false,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:9,interval:30}},
+            yAxis:{type:'value',splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+            dataZoom:[{type:'inside',start:0,end:100}],
+            series:[{type:'line',data:vl,smooth:true,symbol:'none',lineStyle:{width:2,color:'#22d3ee'},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(34,211,238,.2)'},{offset:1,color:'rgba(34,211,238,.02)'}]}}}]
+          });
+          document.getElementById('drill-concl').textContent = brand+' 全年社媒声量趋势';
+        }
+      });
+    });
+  } else if(view==='trend'){
+    var d = DATA.volume_trend;
+    var dates = d.map(function(x){return x.date;});
+    var vols = d.map(function(x){return x.volume;});
+    socialChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+      grid:{left:50,right:20,top:15,bottom:35},
+      xAxis:{type:'category',data:dates,boundaryGap:false,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:9,interval:30}},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      dataZoom:[{type:'inside',start:0,end:100}],
+      series:[{type:'line',data:vols,smooth:true,symbol:'none',lineStyle:{width:2,color:'#22d3ee'},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(34,211,238,.2)'},{offset:1,color:'rgba(34,211,238,.02)'}]}}}]
+    });
+    socialChart.off('click');
+    makeConcl('concl-social','全年社媒声量趋势 | 日均声量: '+Math.round(vols.reduce(function(a,b){return a+b;},0)/vols.length));
+  } else {
+    var d = DATA.platform_sentiment;
+    var pl = d.map(function(x){return x['平台'];});
+    var pp = d.map(function(x){return Math.round((x['正面']||0));});
+    var pn = d.map(function(x){return Math.round((x['负面']||0));});
+    socialChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+      legend:{data:['正面占比','负面占比'],textStyle:{color:'#6b8aaa',fontSize:10},top:0},
+      grid:{left:45,right:20,top:32,bottom:30},
+      xAxis:{type:'category',data:pl,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      yAxis:{type:'value',name:'占比(%)',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      series:[
+        {name:'正面占比',type:'bar',data:pp,itemStyle:{borderRadius:[3,3,0,0],color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#34d399'},{offset:1,color:'#10b981'}]}}},
+        {name:'负面占比',type:'bar',data:pn,itemStyle:{borderRadius:[3,3,0,0],color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#f87171'},{offset:1,color:'#ef4444'}]}}}
+      ]
+    });
+    socialChart.off('click');
+    socialChart.on('click', function(p){
+      var plt = p.name;
+      openDrill('平台下钻: '+plt, [{label:'品牌情感分布',key:'b'}], function(){
+        // simplified drill
+        document.getElementById('drill-concl').textContent = plt+' 平台品牌情感分布详情';
+      });
+    });
+    makeConcl('concl-social','点击查看平台详情');
+  }
+}
+
+// ===== Journey =====
+var journeyChart = null;
+function switchJourneyTab(el, view){
+  el.closest('.chart-box').querySelectorAll('.main-tab').forEach(function(x){x.classList.remove('active');});
+  el.classList.add('active');
+  renderJourneyChart(view);
+}
+function renderJourneyChart(view){
+  journeyChart = echarts.init(document.getElementById('chart-journey'), 'dark');
+  if(view==='loyalty'){
+    var d = DATA.brand_loyalty;
+    var names = d.map(function(x){return x.brand;});
+    var vals = d.map(function(x){return x.loyalty_rate;});
+    journeyChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+      grid:{left:50,right:30,top:15,bottom:30},
+      xAxis:{type:'category',data:names,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      yAxis:{type:'value',name:'忠诚度(%)',max:100,nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10,formatter:'{value}%'}},
+      series:[{type:'bar',data:vals,barWidth:'50%',itemStyle:{borderRadius:[4,4,0,0],color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#a78bfa'},{offset:1,color:'#6366f1'}]}},label:{show:true,position:'top',color:'#c8d6e5',fontSize:10,formatter:'{c}%'}}]
+    });
+    var top = d.reduce(function(a,b){return a.loyalty_rate > b.loyalty_rate ? a : b;});
+    makeConcl('concl-journey','品牌忠诚度最高: '+top.brand+' ('+top.loyalty_rate+'%) | 点击查看用户画像');
+    journeyChart.off('click');
+    journeyChart.on('click', function(p){
+      var brand = p.name;
+      var prof = DATA.profile;
+      openDrill('用户画像: '+brand,
+        [{label:'年龄分布',key:'age'},{label:'性别分布',key:'gender'},{label:'价格区间',key:'price'}],
+        function(k){
+          var ch = echarts.init(document.getElementById('drill-chart'),'dark');
+          var raw = prof[k][brand];
+          var keys = Object.keys(raw).sort();
+          var vals = keys.map(function(x){return raw[x];});
+          ch.setOption({
+            tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+            grid:{left:50,right:20,top:15,bottom:35},
+            xAxis:{type:'category',data:keys,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:11,rotate:keys.length>5?15:0}},
+            yAxis:{type:'value',splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+            series:[{type:'bar',data:vals,barWidth:'45%',itemStyle:{borderRadius:[4,4,0,0],color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#a78bfa'},{offset:1,color:'#6366f1'}]}},label:{show:true,position:'top',color:'#c8d6e5',fontSize:10}}]
+          });
+          document.getElementById('drill-concl').textContent = brand+' 用户 '+{age:'年龄',gender:'性别',price:'价格区间'}[k]+' 分布';
+        }
+      );
+    });
+  } else if(view==='flow'){
+    var d = DATA.brand_flow;
+    // Simple heatmap-like view: brand flow
+    var sources = [...new Set(d.map(function(x){return x.source;}))];
+    var targets = [...new Set(d.map(function(x){return x.target;}))];
+    var matrix = sources.map(function(s){
+      return targets.map(function(t){
+        var f = d.filter(function(x){return x.source===s && x.target===t;});
+        return f.length ? f[0].value : 0;
+      });
+    });
+    journeyChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+      grid:{left:50,right:50,top:15,bottom:30},
+      xAxis:{type:'category',data:targets,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:9,rotate:20}},
+      yAxis:{type:'category',data:sources,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:9}},
+      visualMap:{min:0,max:Math.max(...d.map(function(x){return x.value;})),calculable:true,inRange:{color:['#0a1628','#0891b2','#22d3ee','#00f5d4']},textStyle:{color:'#6b8aaa'}},
+      series:[{type:'heatmap',data:matrix.flatMap(function(row,i){return row.map(function(v,j){return [j,i,v];});}),label:{show:true,color:'#c8d6e5',fontSize:9},emphasis:{itemStyle:{shadowBlur:10,shadowColor:'rgba(0,245,212,.5)'}}}]
+    });
+    makeConcl('concl-journey','热力图: 颜色越亮表示该流向用户越多 | 从(左)品牌流向(下)品牌');
+    journeyChart.off('click');
+  } else {
+    var d = DATA.reasons;
+    var names = d.map(function(x){return x.reason;});
+    var vals = d.map(function(x){return x.count;});
+    journeyChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+      grid:{left:80,right:20,top:15,bottom:30},
+      xAxis:{type:'value',splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      yAxis:{type:'category',data:names,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      series:[{type:'bar',data:vals,barWidth:'55%',itemStyle:{borderRadius:[0,4,4,0],color:{type:'linear',x:0,y:0,x2:1,y2:0,colorStops:[{offset:0,color:'#818cf8'},{offset:1,color:'#6366f1'}]}},label:{show:true,position:'right',color:'#c8d6e5',fontSize:10}}]
+    });
+    journeyChart.off('click');
+    makeConcl('concl-journey','换机原因TOP: '+names[0]+' ('+vals[0]+'人) | '+names[1]+' ('+vals[1]+'人)');
+  }
+}
+
+// ===== Competitive =====
+var competeChart = null;
+function switchCompeteTab(el, view){
+  el.closest('.chart-box').querySelectorAll('.main-tab').forEach(function(x){x.classList.remove('active');});
+  el.classList.add('active');
+  renderCompeteChart(view);
+}
+function renderCompeteChart(view){
+  competeChart = echarts.init(document.getElementById('chart-compete'), 'dark');
+  if(view==='share'){
+    var d = DATA.market_share;
+    var names = d.map(function(x){return x.brand;});
+    var vals = d.map(function(x){return x.share;});
+    var colors = names.map(function(n){return BRAND_COLORS[n] || '#6b8aaa';});
+    competeChart.setOption({
+      tooltip:{trigger:'item',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11},formatter:'{b}: {c}%'},
+      series:[{type:'pie',radius:['35%','65%'],center:['50%','55%'],data:d.map(function(x){return {name:x.brand,value:x.share};}),itemStyle:{borderColor:'#0a1628',borderWidth:2},
+        label:{color:'#c8d6e5',fontSize:10,formatter:'{b}\n{d}%'},emphasis:{itemStyle:{shadowBlur:10,shadowColor:'rgba(0,245,212,.3)'}},
+        color:colors}]
+    });
+    var top = d.reduce(function(a,b){return a.share > b.share ? a : b;});
+    makeConcl('concl-compete','市场第一: '+top.brand+' ('+top.share+'%)');
+    competeChart.off('click');
+    competeChart.on('click', function(p){
+      var brand = p.name;
+      var st = DATA.share_trend.filter(function(x){return x['品牌']===brand;}).sort(function(a,b){return a['月'] > b['月'] ? 1 : -1;});
+      var months = st.map(function(x){return x['月'];});
+      var shares = st.map(function(x){return x['市场份额(%)'];});
+      openDrill('份额趋势: '+brand, [{label:'月度份额变化',key:'m'}], function(){
+        var ch = echarts.init(document.getElementById('drill-chart'),'dark');
+        ch.setOption({
+          tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11},formatter:function(ps){var p=ps[0];return '<strong>'+p.name+'</strong><br/>份额: '+p.value+'%';}},
+          grid:{left:50,right:20,top:15,bottom:35},
+          xAxis:{type:'category',data:months,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+          yAxis:{type:'value',name:'%',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+          series:[{type:'line',data:shares,smooth:true,symbol:'circle',lineStyle:{width:2,color:BRAND_COLORS[brand]||'#22d3ee'},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(34,211,238,.15)'},{offset:1,color:'rgba(34,211,238,.02)'}]}}}]
+        });
+        document.getElementById('drill-concl').textContent = brand+' 月度市场份额变化';
+      });
+    });
+  } else if(view==='trend'){
+    var d = DATA.share_trend;
+    var months = [...new Set(d.map(function(x){return x['月'];}))].sort();
+    competeChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11}},
+      legend:{data:BRAND_LIST,textStyle:{color:'#6b8aaa',fontSize:9},top:0},
+      grid:{left:45,right:20,top:32,bottom:30},
+      xAxis:{type:'category',data:months,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:9}},
+      yAxis:{type:'value',name:'%',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      series:BRAND_LIST.map(function(b){
+        var vals = months.map(function(m){
+          var f = d.filter(function(x){return x['品牌']===b && x['月']===m;});
+          return f.length ? f[0]['市场份额(%)'] : 0;
+        });
+        return {name:b,type:'line',data:vals,smooth:true,symbol:'none',lineStyle:{width:2,color:BRAND_COLORS[b]}};
+      })
+    });
+    competeChart.off('click');
+    makeConcl('concl-compete','各品牌月度市场份额变化趋势');
+  } else {
+    var d = DATA.avg_price;
+    var names = d.map(function(x){return x.brand;});
+    var vals = d.map(function(x){return x.avg_price;});
+    competeChart.setOption({
+      tooltip:{trigger:'axis',backgroundColor:'rgba(6,20,40,.9)',borderColor:'rgba(0,245,212,.3)',textStyle:{color:'#c8d6e5',fontSize:11},formatter:function(ps){var p=ps[0];return '<strong>'+p.name+'</strong><br/>均价: ¥'+p.value.toFixed(0);}},
+      grid:{left:55,right:20,top:15,bottom:30},
+      xAxis:{type:'category',data:names,axisLine:{lineStyle:{color:'#1a3a5a'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      yAxis:{type:'value',name:'元',nameTextStyle:{color:'#4a6a8a',fontSize:10},splitLine:{lineStyle:{color:'rgba(0,245,212,.05)',type:'dashed'}},axisLabel:{color:'#6b8aaa',fontSize:10}},
+      series:[{type:'bar',data:vals,barWidth:'50%',itemStyle:{borderRadius:[4,4,0,0],color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#fbbf24'},{offset:1,color:'#f97316'}]}},label:{show:true,position:'top',color:'#c8d6e5',fontSize:10,formatter:'¥{c}'}}]
+    });
+    competeChart.off('click');
+    var top = d.reduce(function(a,b){return a.avg_price > b.avg_price ? a : b;});
+    makeConcl('concl-compete','均价最高: '+top.brand+' (¥'+top.avg_price.toFixed(0)+')');
+  }
+}
+
+window.addEventListener('resize', function(){
+  if(mediaChart) mediaChart.resize();
+  if(socialChart) socialChart.resize();
+  if(journeyChart) journeyChart.resize();
+  if(competeChart) competeChart.resize();
+});
+</script>
+</body>
+</html>
